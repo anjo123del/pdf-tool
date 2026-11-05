@@ -13,15 +13,20 @@
 <button id="go">Process &amp; Save</button>
 <p id="msg"></p>
 
+<button id="save" style="display:none">Save file</button>
 <script type="module">
-import createModule from "./qpdf.js";
 const $ = id => document.getElementById(id);
+const msg = t => $("msg").textContent = t;
+window.onerror = (m) => msg("Error: " + m);
+let result = null;
 
 $("go").onclick = async () => {
-  const file = $("f").files[0];
-  if (!file) return $("msg").textContent = "Pick a PDF first.";
-  $("msg").textContent = "Working...";
   try {
+    const file = $("f").files[0];
+    if (!file) return msg("Pick a PDF first.");
+    msg("Loading engine...");
+    const mod = await import("./qpdf.js");
+    const createModule = mod.default || mod;
     const q = await createModule({ locateFile: () => "./qpdf.wasm" });
     q.FS.writeFile("/in.pdf", new Uint8Array(await file.arrayBuffer()));
     const args = ["--password=" + $("cur").value];
@@ -33,12 +38,19 @@ $("go").onclick = async () => {
     }
     q.callMain(args);
     const out = q.FS.readFile("/out.pdf");
-    const result = new File([out], file.name, { type: "application/pdf" });
-    await navigator.share({ files: [result] });
-    $("msg").textContent = "Done.";
+    result = new File([out], file.name, { type: "application/pdf" });
+    $("save").style.display = "inline";
+    msg("Done. Tap Save file.");
   } catch (e) {
-    $("msg").textContent = "Failed: wrong password or unsupported file.";
+    msg("Failed: " + (e.message || e));
+  }
+};
+
+$("save").onclick = async () => {
+  try {
+    await navigator.share({ files: [result] });
+  } catch (e) {
+    msg("Share failed: " + (e.message || e));
   }
 };
 </script>
-</body>
