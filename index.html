@@ -2,7 +2,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>PDF Password Tool</title>
 <body style="font-family:system-ui;padding:20px;max-width:420px;margin:auto">
-<h2>PDF Password Tool</h2>
+<h2>PDF Password Tool v8</h2>
 <input type="file" id="f" accept="application/pdf"><br><br>
 <input id="cur" type="password" placeholder="Current password"><br><br>
 <select id="mode">
@@ -11,7 +11,7 @@
 </select><br><br>
 <input id="new" type="password" placeholder="New password (if changing)"><br><br>
 <button id="go">Process &amp; Save</button>
-<p id="msg"></p>
+<p id="msg" style="white-space:pre-wrap"></p>
 <button id="save" style="display:none">Save file</button>
 
 <script src="./qpdf.js"></script>
@@ -21,6 +21,7 @@ const msg = t => $("msg").textContent = t;
 let result = null;
 
 $("go").onclick = async () => {
+  let log = "";
   try {
     const file = $("f").files[0];
     if (!file) return msg("Pick a PDF first.");
@@ -30,8 +31,21 @@ $("go").onclick = async () => {
     if (mode === "change" && !np) return msg("Enter a new password.");
     if (typeof Module !== "function") return msg("Engine file not loaded.");
 
+    msg("Starting engine...");
+    const q = await Module({
+      locateFile: () => "./qpdf.wasm",
+      noInitialRun: true,
+      print: t => log += t + "\n",
+      printErr: t => log += t + "\n"
+    });
+
+    if (!q || !q.FS || !q.callMain) {
+      return msg("Engine started but missing parts. Keys: " +
+        Object.keys(q || {}).join(","));
+    }
+
     msg("Processing...");
-    const data = new Uint8Array(await file.arrayBuffer());
+    q.FS.writeFile("/in.pdf", new Uint8Array(await file.arrayBuffer()));
 
     const args = [];
     if (cur) args.push("--password=" + cur);
@@ -41,32 +55,27 @@ $("go").onclick = async () => {
       args.push("--encrypt", np, np, "256", "--", "/in.pdf", "/out.pdf");
     }
 
-    let inst = null;
-    let log = "";
+    let exitInfo = "";
     try {
-      await Module({
-        locateFile: () => "./qpdf.wasm",
-        arguments: args,
-        print: t => log += t + "\n",
-        printErr: t => log += t + "\n",
-        preRun: [m => { inst = m; m.FS.writeFile("/in.pdf", data); }]
-      });
+      const code = q.callMain(args);
+      exitInfo = "exit " + code;
     } catch (e) {
-      log += String(e && e.message || e);
+      exitInfo = "threw " + (e && (e.message || e.status) || e);
     }
 
     let out;
     try {
-      out = inst.FS.readFile("/out.pdf");
+      out = q.FS.readFile("/out.pdf");
     } catch (e) {
-      return msg("Failed. " + (log.trim() || "No output file (wrong password or unsupported PDF)."));
+      return msg("No output file (" + exitInfo + ").\nqpdf said:\n" +
+        (log.trim() || "(nothing)"));
     }
 
     result = new File([out], file.name, { type: "application/pdf" });
     $("save").style.display = "inline";
-    msg("Done. Tap Save file.");
+    msg("Done. Tap Save file." + (log.trim() ? "\nNote: " + log.trim() : ""));
   } catch (e) {
-    msg("Failed: " + (e.message || e));
+    msg("Failed: " + (e.message || e) + (log ? "\n" + log : ""));
   }
 };
 
@@ -79,3 +88,4 @@ $("save").onclick = async () => {
 };
 </script>
 </body>
+</html>
