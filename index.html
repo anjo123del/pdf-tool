@@ -1,91 +1,128 @@
 <!doctype html>
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PDF Password Tool</title>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PDF Password Tool</title>
+</head>
 <body style="font-family:system-ui;padding:20px;max-width:420px;margin:auto">
-<h2>PDF Password Tool v8</h2>
-<input type="file" id="f" accept="application/pdf"><br><br>
-<input id="cur" type="password" placeholder="Current password"><br><br>
-<select id="mode">
-  <option value="remove">Remove password</option>
-  <option value="change">Change password</option>
-</select><br><br>
-<input id="new" type="password" placeholder="New password (if changing)"><br><br>
-<button id="go">Process &amp; Save</button>
-<p id="msg" style="white-space:pre-wrap"></p>
-<button id="save" style="display:none">Save file</button>
+  <h2>PDF Password Tool v8</h2>
+  <input type="file" id="f" accept="application/pdf,.pdf"><br><br>
+  <input id="cur" type="password" placeholder="Current password" autocomplete="current-password"><br><br>
+  <select id="mode">
+    <option value="remove">Remove password</option>
+    <option value="change">Change password</option>
+  </select><br><br>
+  <input id="new" type="password" placeholder="New password (if changing)" autocomplete="new-password"><br><br>
+  <button id="go" type="button">Process &amp; Save</button>
+  <p id="msg" style="white-space:pre-wrap" role="status" aria-live="polite"></p>
+  <button id="save" type="button" style="display:none">Save file</button>
 
-<script src="./qpdf.js"></script>
-<script>
-const $ = id => document.getElementById(id);
-const msg = t => $("msg").textContent = t;
-let result = null;
+  <script src="./qpdf.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    const msg = text => { $("msg").textContent = text; };
+    let result = null;
 
-$("go").onclick = async () => {
-  let log = "";
-  try {
-    const file = $("f").files[0];
-    if (!file) return msg("Pick a PDF first.");
-    const cur = $("cur").value;
-    const mode = $("mode").value;
-    const np = $("new").value;
-    if (mode === "change" && !np) return msg("Enter a new password.");
-    if (typeof Module !== "function") return msg("Engine file not loaded.");
+    $("go").onclick = async () => {
+      let log = "";
+      const go = $("go");
+      result = null;
+      $("save").style.display = "none";
+      go.disabled = true;
 
-    msg("Starting engine...");
-    const q = await Module({
-      locateFile: () => "./qpdf.wasm",
-      noInitialRun: true,
-      print: t => log += t + "\n",
-      printErr: t => log += t + "\n"
-    });
+      try {
+        const file = $("f").files[0];
+        if (!file) return msg("Pick a PDF first.");
+        if (file.type && file.type !== "application/pdf") return msg("Choose a PDF file.");
 
-    if (!q || !q.FS || !q.callMain) {
-      return msg("Engine started but missing parts. Keys: " +
-        Object.keys(q || {}).join(","));
-    }
+        const cur = $("cur").value;
+        const mode = $("mode").value;
+        const np = $("new").value;
+        if (mode === "change" && !np) return msg("Enter a new password.");
+        if (typeof Module !== "function") return msg("Engine file not loaded.");
 
-    msg("Processing...");
-    q.FS.writeFile("/in.pdf", new Uint8Array(await file.arrayBuffer()));
+        msg("Starting engine...");
+        const q = await Module({
+          locateFile: name => name.endsWith(".wasm") ? "./qpdf.wasm" : name,
+          noInitialRun: true,
+          print: text => { log += text + "\n"; },
+          printErr: text => { log += text + "\n"; }
+        });
 
-    const args = [];
-    if (cur) args.push("--password=" + cur);
-    if (mode === "remove") {
-      args.push("--decrypt", "/in.pdf", "/out.pdf");
-    } else {
-      args.push("--encrypt", np, np, "256", "--", "/in.pdf", "/out.pdf");
-    }
+        if (!q || !q.FS || typeof q.callMain !== "function") {
+          return msg("Engine started but is missing required features.");
+        }
 
-    let exitInfo = "";
-    try {
-      const code = q.callMain(args);
-      exitInfo = "exit " + code;
-    } catch (e) {
-      exitInfo = "threw " + (e && (e.message || e.status) || e);
-    }
+        msg("Processing...");
+        const data = new Uint8Array(await file.arrayBuffer());
+        q.FS.writeFile("/in.pdf", data);
 
-    let out;
-    try {
-      out = q.FS.readFile("/out.pdf");
-    } catch (e) {
-      return msg("No output file (" + exitInfo + ").\nqpdf said:\n" +
-        (log.trim() || "(nothing)"));
-    }
+        const args = [];
+        if (cur) args.push("--password=" + cur);
+        if (mode === "remove") {
+          args.push("--decrypt", "/in.pdf", "/out.pdf");
+        } else {
+          args.push("--encrypt", np, np, "256", "--", "/in.pdf", "/out.pdf");
+        }
 
-    result = new File([out], file.name, { type: "application/pdf" });
-    $("save").style.display = "inline";
-    msg("Done. Tap Save file." + (log.trim() ? "\nNote: " + log.trim() : ""));
-  } catch (e) {
-    msg("Failed: " + (e.message || e) + (log ? "\n" + log : ""));
-  }
-};
+        let exitInfo = "";
+        try {
+          const code = q.callMain(args);
+          exitInfo = "exit " + code;
+          if (typeof code === "number" && code !== 0) {
+            return msg("qpdf failed (" + exitInfo + ").\n" + (log.trim() || "Check the current password and PDF file."));
+          }
+        } catch (error) {
+          // Some Emscripten builds throw ExitStatus even when main returns normally.
+          if (error && error.name === "ExitStatus" && error.status === 0) {
+            exitInfo = "exit 0";
+          } else {
+            exitInfo = "threw " + (error && (error.message || error.status) || error);
+          }
+        }
 
-$("save").onclick = async () => {
-  try {
-    await navigator.share({ files: [result] });
-  } catch (e) {
-    msg("Share failed: " + (e.message || e));
-  }
-};
-</script>
+        let out;
+        try {
+          out = q.FS.readFile("/out.pdf");
+        } catch (error) {
+          return msg("No output file (" + exitInfo + ").\nqpdf said:\n" + (log.trim() || "Check the current password and PDF file."));
+        }
+        if (!out || out.length === 0) return msg("qpdf produced an empty output file (" + exitInfo + ").\n" + (log.trim() || ""));
+
+        result = new File([out], file.name, { type: "application/pdf" });
+        $("save").style.display = "inline-block";
+        msg("Done. Tap Save file." + (log.trim() ? "\nNote: " + log.trim() : ""));
+      } catch (error) {
+        msg("Failed: " + (error && (error.message || error) || "Unknown error") + (log ? "\n" + log : ""));
+      } finally {
+        go.disabled = false;
+      }
+    };
+
+    $("save").onclick = async () => {
+      if (!result) return msg("Process a PDF before saving.");
+
+      if (navigator.canShare && navigator.canShare({ files: [result] }) && navigator.share) {
+        try {
+          await navigator.share({ files: [result], title: result.name });
+          return;
+        } catch (error) {
+          if (error && error.name === "AbortError") return;
+          // Fall through to the download option if sharing is unavailable.
+        }
+      }
+
+      const url = URL.createObjectURL(result);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = result.name;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      msg("File download started.");
+    };
+  </script>
 </body>
 </html>
