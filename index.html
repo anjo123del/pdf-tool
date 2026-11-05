@@ -27,21 +27,23 @@ $("go").onclick = async () => {
     const file = $("f").files[0];
     if (!file) return msg("Pick a PDF first.");
     msg("Loading engine...");
-    if (!window.QModule) {
-  await new Promise((res, rej) => {
-    window.Module = {
-      locateFile: () => "./qpdf.wasm",
-      noInitialRun: true,
-      onRuntimeInitialized: () => res()
-    };
-    const s = document.createElement("script");
-    s.src = "./qpdf.js";
-    s.onerror = () => rej(new Error("qpdf.js not found"));
-    document.body.appendChild(s);
-  });
-  window.QModule = window.Module;
-}
-const q = window.QModule;
+    const q = await new Promise((res, rej) => {
+  const M = {
+    locateFile: () => "./qpdf.wasm",
+    noInitialRun: true,
+    onRuntimeInitialized: () => res(M)
+  };
+  window.Module = M;
+  const s = document.createElement("script");
+  s.src = "./qpdf.js?v=" + Date.now();
+  s.onerror = () => rej(new Error("qpdf.js failed to load"));
+  document.body.appendChild(s);
+  setTimeout(() => rej(new Error(
+    "Engine timeout. Module keys: " + Object.keys(window.Module || {}).join(",") +
+    " | FS: " + typeof (window.Module && window.Module.FS)
+  )), 15000);
+});
+
 
     const args = ["--password=" + $("cur").value];
     if ($("mode").value === "remove") {
