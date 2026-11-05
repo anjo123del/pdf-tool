@@ -12,10 +12,8 @@
 <input id="new" type="password" placeholder="New password (if changing)"><br><br>
 <button id="go">Process &amp; Save</button>
 <p id="msg"></p>
-  <script>document.getElementById("msg").textContent="Page v2 loaded";</script>
-
-
 <button id="save" style="display:none">Save file</button>
+
 <script type="module">
 const $ = id => document.getElementById(id);
 const msg = t => $("msg").textContent = t;
@@ -27,33 +25,39 @@ $("go").onclick = async () => {
     const file = $("f").files[0];
     if (!file) return msg("Pick a PDF first.");
     msg("Loading engine...");
-    const q = await new Promise((res, rej) => {
-  const M = {
-    locateFile: () => "./qpdf.wasm",
-    noInitialRun: true,
-    onRuntimeInitialized: () => res(M)
-  };
-  window.Module = M;
-  const s = document.createElement("script");
-  s.src = "./qpdf.js?v=" + Date.now();
-  s.onerror = () => rej(new Error("qpdf.js failed to load"));
-  document.body.appendChild(s);
-  setTimeout(() => rej(new Error(
-    "Engine timeout. Module keys: " + Object.keys(window.Module || {}).join(",") +
-    " | FS: " + typeof (window.Module && window.Module.FS)
-  )), 15000);
-});
 
+    const mod = await import("./qpdf.js?v=" + Date.now());
+    let q = mod.default || mod;
+    if (typeof q === "function") {
+      q = await q({ locateFile: () => "./qpdf.wasm", noInitialRun: true });
+    }
+    for (let i = 0; i < 100 && !(q && q.FS); i++) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+    if (!q || !q.FS) {
+      throw new Error("No FS. Keys: " + Object.keys(q || {}).join(","));
+    }
+
+    msg("Processing...");
+    q.FS.writeFile("/in.pdf", new Uint8Array(await file.arrayBuffer()));
 
     const args = ["--password=" + $("cur").value];
     if ($("mode").value === "remove") {
       args.push("--decrypt", "/in.pdf", "/out.pdf");
     } else {
       const p = $("new").value;
+      if (!p) return msg("Enter a new password.");
       args.push("--encrypt", p, p, "256", "--", "/in.pdf", "/out.pdf");
     }
-    q.callMain(args);
-    const out = q.FS.readFile("/out.pdf");
+
+    try { q.callMain(args); } catch (e) { /* exit status is thrown on some builds */ }
+
+    let out;
+    try {
+      out = q.FS.readFile("/out.pdf");
+    } catch (e) {
+      throw new Error("No output file. Wrong password or unsupported PDF.");
+    }
     result = new File([out], file.name, { type: "application/pdf" });
     $("save").style.display = "inline";
     msg("Done. Tap Save file.");
@@ -70,3 +74,4 @@ $("save").onclick = async () => {
   }
 };
 </script>
+</body>
