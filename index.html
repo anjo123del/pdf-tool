@@ -14,50 +14,54 @@
 <p id="msg"></p>
 <button id="save" style="display:none">Save file</button>
 
-<script type="module">
+<script src="./qpdf.js"></script>
+<script>
 const $ = id => document.getElementById(id);
 const msg = t => $("msg").textContent = t;
-window.onerror = (m) => msg("Error: " + m);
 let result = null;
 
 $("go").onclick = async () => {
   try {
     const file = $("f").files[0];
     if (!file) return msg("Pick a PDF first.");
-    msg("Loading engine...");
-
-    const mod = await import("./qpdf.js?v=" + Date.now());
-    let q = mod.default || mod;
-    if (typeof q === "function") {
-      q = await q({ locateFile: () => "./qpdf.wasm", noInitialRun: true });
-    }
-    for (let i = 0; i < 100 && !(q && q.FS); i++) {
-      await new Promise(r => setTimeout(r, 100));
-    }
-    if (!q || !q.FS) {
-      throw new Error("No FS. Keys: " + Object.keys(q || {}).join(","));
-    }
+    const cur = $("cur").value;
+    const mode = $("mode").value;
+    const np = $("new").value;
+    if (mode === "change" && !np) return msg("Enter a new password.");
+    if (typeof Module !== "function") return msg("Engine file not loaded.");
 
     msg("Processing...");
-    q.FS.writeFile("/in.pdf", new Uint8Array(await file.arrayBuffer()));
+    const data = new Uint8Array(await file.arrayBuffer());
 
-    const args = ["--password=" + $("cur").value];
-    if ($("mode").value === "remove") {
+    const args = [];
+    if (cur) args.push("--password=" + cur);
+    if (mode === "remove") {
       args.push("--decrypt", "/in.pdf", "/out.pdf");
     } else {
-      const p = $("new").value;
-      if (!p) return msg("Enter a new password.");
-      args.push("--encrypt", p, p, "256", "--", "/in.pdf", "/out.pdf");
+      args.push("--encrypt", np, np, "256", "--", "/in.pdf", "/out.pdf");
     }
 
-    try { q.callMain(args); } catch (e) { /* exit status is thrown on some builds */ }
+    let inst = null;
+    let log = "";
+    try {
+      await Module({
+        locateFile: () => "./qpdf.wasm",
+        arguments: args,
+        print: t => log += t + "\n",
+        printErr: t => log += t + "\n",
+        preRun: [m => { inst = m; m.FS.writeFile("/in.pdf", data); }]
+      });
+    } catch (e) {
+      log += String(e && e.message || e);
+    }
 
     let out;
     try {
-      out = q.FS.readFile("/out.pdf");
+      out = inst.FS.readFile("/out.pdf");
     } catch (e) {
-      throw new Error("No output file. Wrong password or unsupported PDF.");
+      return msg("Failed. " + (log.trim() || "No output file (wrong password or unsupported PDF)."));
     }
+
     result = new File([out], file.name, { type: "application/pdf" });
     $("save").style.display = "inline";
     msg("Done. Tap Save file.");
