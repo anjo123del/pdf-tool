@@ -1,0 +1,44 @@
+<!doctype html>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PDF Password Tool</title>
+<body style="font-family:system-ui;padding:20px;max-width:420px;margin:auto">
+<h2>PDF Password Tool</h2>
+<input type="file" id="f" accept="application/pdf"><br><br>
+<input id="cur" type="password" placeholder="Current password"><br><br>
+<select id="mode">
+  <option value="remove">Remove password</option>
+  <option value="change">Change password</option>
+</select><br><br>
+<input id="new" type="password" placeholder="New password (if changing)"><br><br>
+<button id="go">Process &amp; Save</button>
+<p id="msg"></p>
+
+<script type="module">
+import createModule from "./qpdf.js";
+const $ = id => document.getElementById(id);
+
+$("go").onclick = async () => {
+  const file = $("f").files[0];
+  if (!file) return $("msg").textContent = "Pick a PDF first.";
+  $("msg").textContent = "Working...";
+  try {
+    const q = await createModule({ locateFile: () => "./qpdf.wasm" });
+    q.FS.writeFile("/in.pdf", new Uint8Array(await file.arrayBuffer()));
+    const args = ["--password=" + $("cur").value];
+    if ($("mode").value === "remove") {
+      args.push("--decrypt", "/in.pdf", "/out.pdf");
+    } else {
+      const p = $("new").value;
+      args.push("--encrypt", p, p, "256", "--", "/in.pdf", "/out.pdf");
+    }
+    q.callMain(args);
+    const out = q.FS.readFile("/out.pdf");
+    const result = new File([out], file.name, { type: "application/pdf" });
+    await navigator.share({ files: [result] });
+    $("msg").textContent = "Done.";
+  } catch (e) {
+    $("msg").textContent = "Failed: wrong password or unsupported file.";
+  }
+};
+</script>
+</body>
