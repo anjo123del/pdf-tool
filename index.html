@@ -457,6 +457,7 @@ view.state = "none"; view("none");
     fetch("./qpdf.wasm").then(function(r){ return r.arrayBuffer(); }).then(finish, finish);
   }
   if (document.readyState === "complete") go(); else window.addEventListener("load", go);
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(function(){});
 })();
 </script>
 </body>
