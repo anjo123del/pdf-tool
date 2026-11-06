@@ -115,9 +115,23 @@
   .qa{border-top:1px solid var(--line);padding-top:20px}
   .qa p{margin:8px 0 0;color:var(--muted)}
   footer{border-top:1px solid var(--line);padding:32px 24px;text-align:center;font-size:14px;color:var(--muted)}
+
+  #preload{position:fixed;inset:0;z-index:100;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;transition:opacity .35s ease,visibility .35s}
+  #preload.gone{opacity:0;visibility:hidden}
+  #preload .lock{width:72px;height:72px;border-radius:20px;background:var(--alt);color:var(--blue);display:flex;align-items:center;justify-content:center}
+  #preload .ring{width:28px;height:28px;border-radius:50%;border:3px solid var(--track);border-top-color:var(--blue);animation:spin .8s linear infinite}
+  #preload p{margin:0;font-size:14px;color:var(--muted)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (prefers-reduced-motion:reduce){#preload{transition:none}#preload .ring{animation-duration:2.4s}}
 </style>
 </head>
 <body>
+<div id="preload" role="status" aria-live="polite">
+  <div class="lock"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></div>
+  <div class="ring" aria-hidden="true"></div>
+  <p id="preText">Loading…</p>
+</div>
+
 <nav>
   <strong>PDF Password Tool</strong>
   <div class="links"><a class="opt" href="#how">How it works</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a></div>
@@ -430,6 +444,20 @@ $("again").onclick = () => {
 };
 
 view.state = "none"; view("none");
+</script>
+<script>
+(function(){
+  var pre = document.getElementById("preload"), txt = document.getElementById("preText"), done = false;
+  function hide(){ if (done) return; done = true; pre.classList.add("gone"); setTimeout(function(){ pre.hidden = true; }, 500); }
+  var start = Date.now();
+  function finish(){ var wait = Math.max(0, 450 - (Date.now() - start)); setTimeout(hide, wait); }
+  setTimeout(hide, 8000); // never block the page
+  function go(){
+    txt.textContent = "Getting the engine ready…";
+    fetch("./qpdf.wasm").then(function(r){ return r.arrayBuffer(); }).then(finish, finish);
+  }
+  if (document.readyState === "complete") go(); else window.addEventListener("load", go);
+})();
 </script>
 </body>
 </html>
