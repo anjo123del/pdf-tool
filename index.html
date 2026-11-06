@@ -240,7 +240,7 @@
   <div class="qa"><strong>Does it change my original file?</strong><p>Never. You always get a new copy.</p></div>
 </div></section>
 
-<footer>&copy; 2026 PDF Password Tool &middot; <a href="#privacy">Privacy</a></footer>
+<footer>&copy; 2026 PDF Password Tool &middot; <a href="#privacy">Privacy</a> &middot; v13</footer>
 
 <script src="./qpdf.js"></script>
 <script>
@@ -448,7 +448,12 @@ view.state = "none"; view("none");
 <script>
 (function(){
   if ("scrollRestoration" in history) history.scrollRestoration = "manual";
-  if (!location.hash) { window.scrollTo(0, 0); window.addEventListener("load", function(){ window.scrollTo(0, 0); }); window.addEventListener("pageshow", function(){ if (!location.hash) window.scrollTo(0, 0); }); }
+  var touched = false;
+  ["touchstart","wheel","keydown","mousedown"].forEach(function(ev){ window.addEventListener(ev, function(){ touched = true; }, { passive: true, once: true }); });
+  function top(){ if (!location.hash && !touched) window.scrollTo(0, 0); }
+  top();
+  window.addEventListener("load", function(){ top(); [100, 300, 700, 1200].forEach(function(ms){ setTimeout(top, ms); }); });
+  window.addEventListener("pageshow", function(){ top(); [100, 300, 700].forEach(function(ms){ setTimeout(top, ms); }); });
   var pre = document.getElementById("preload"), txt = document.getElementById("preText"), done = false;
   function hide(){ if (done) return; done = true; pre.classList.add("gone"); setTimeout(function(){ pre.hidden = true; }, 500); }
   var start = Date.now();
