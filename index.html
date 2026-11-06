@@ -1,128 +1,369 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>PDF Password Tool</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PDF Password Tool</title>
+<style>
+  :root{
+    --bg:#F5F5F7; --card:#fff; --text:#1D1D1F; --muted:#6E6E73; --line:#D2D2D7;
+    --blue:#0071E3; --link:#0066CC; --red:#D70015; --green:#248A3D;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+    min-height:100vh; padding:56px 20px calc(40px + env(safe-area-inset-bottom));
+    -webkit-text-size-adjust:100%;
+  }
+  main{max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:40px}
+  header{display:flex;flex-direction:column;gap:12px}
+  h1{margin:0;font-size:34px;line-height:38px;font-weight:600;letter-spacing:-0.02em}
+  header p{margin:0;font-size:17px;line-height:25px;color:var(--muted)}
+  .card{background:var(--card);border-radius:18px;padding:24px;display:flex;flex-direction:column;gap:24px}
+  [hidden]{display:none !important}
+  button{font-family:inherit;cursor:pointer}
+  button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid rgba(0,113,227,.45);outline-offset:2px}
+
+  .drop{
+    height:148px;border:1.5px dashed #86868B;border-radius:14px;background:#FAFAFC;color:var(--text);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;width:100%;
+  }
+  .drop.over{border-color:var(--blue);background:#EEF5FD}
+  .drop b{font-size:17px;font-weight:600}
+  .drop span{font-size:14px;color:var(--muted)}
+
+  .file{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--line);border-radius:12px}
+  .badge{width:40px;height:48px;border-radius:6px;background:var(--bg);color:var(--muted);font-size:11px;font-weight:600;
+    display:flex;align-items:center;justify-content:center;flex:none}
+  .badge.ok{background:#E8F6EC}
+  .file .meta{flex:1;min-width:0}
+  .file .name{font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .file .sub{font-size:14px;color:var(--muted)}
+  .textbtn{min-height:44px;padding:0 8px;border:0;background:none;color:var(--link);font-size:17px}
+  .roundbtn{width:44px;height:44px;border:0;border-radius:22px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex:none}
+
+  .selectwrap{position:relative}
+  select{
+    appearance:none;-webkit-appearance:none;width:100%;height:52px;padding:0 44px 0 14px;
+    border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--text);font-size:17px;font-family:inherit;
+  }
+  select.empty{color:var(--muted)}
+  .selectwrap svg{position:absolute;right:14px;top:16px;pointer-events:none}
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+  .field{display:flex;align-items:center;height:60px;border:1px solid #86868B;border-radius:12px;padding:0 6px 0 14px}
+  .field:focus-within{border-color:var(--blue);box-shadow:0 0 0 4px rgba(0,113,227,.25)}
+  .field.bad{border-color:var(--red);box-shadow:0 0 0 4px rgba(215,0,21,.2)}
+  .field label{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+  .field label span{font-size:12px;color:var(--muted)}
+  .field input{border:0;outline:0;padding:0;background:none;font-size:17px;color:var(--text);min-width:0;width:100%;font-family:inherit}
+  .field input:focus-visible{outline:0}
+  .eye{width:44px;height:44px;border:0;background:none;display:flex;align-items:center;justify-content:center;flex:none}
+
+  .alert{margin-top:-12px;display:flex;align-items:flex-start;gap:8px;font-size:14px;color:var(--red);white-space:pre-wrap}
+  .alert svg{flex:none;margin-top:1px}
+
+  .primary{
+    height:52px;border:0;border-radius:980px;font-size:17px;font-weight:500;
+    display:flex;align-items:center;justify-content:center;gap:8px;background:var(--blue);color:#fff;width:100%;
+  }
+  .primary:disabled{background:var(--line);color:#86868B;cursor:default}
+  .row{display:flex;gap:12px}
+  .row .primary{flex:1}
+  .round52{width:52px;height:52px;border:0;border-radius:26px;background:var(--bg);display:flex;align-items:center;justify-content:center;flex:none}
+
+  .prog{display:flex;flex-direction:column;gap:10px}
+  .prog .top{display:flex;justify-content:space-between;font-size:14px;color:var(--muted)}
+  .bar{height:8px;border-radius:4px;background:#E8E8ED;overflow:hidden}
+  .bar i{display:block;height:8px;border-radius:4px;background:var(--blue);width:0;transition:width .35s ease}
+  .cancel{align-self:center;min-height:44px;padding:0 16px;border:0;background:none;color:var(--link);font-size:17px}
+  @media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
 </head>
-<body style="font-family:system-ui;padding:20px;max-width:420px;margin:auto">
-  <h2>PDF Password Tool v8</h2>
-  <input type="file" id="f" accept="application/pdf,.pdf"><br><br>
-  <input id="cur" type="password" placeholder="Current password" autocomplete="current-password"><br><br>
-  <select id="mode">
-    <option value="remove">Remove password</option>
-    <option value="change">Change password</option>
-  </select><br><br>
-  <input id="new" type="password" placeholder="New password (if changing)" autocomplete="new-password"><br><br>
-  <button id="go" type="button">Process &amp; Save</button>
-  <p id="msg" style="white-space:pre-wrap" role="status" aria-live="polite"></p>
-  <button id="save" type="button" style="display:none">Save file</button>
+<body>
+<main>
+  <header>
+    <h1 id="title">Unlock your PDF.</h1>
+    <p id="sub">Remove, change or add a password. Your file is processed in this browser and never uploaded.</p>
+  </header>
 
-  <script src="./qpdf.js"></script>
-  <script>
-    const $ = id => document.getElementById(id);
-    const msg = text => { $("msg").textContent = text; };
-    let result = null;
+  <div class="card">
+    <input type="file" id="f" accept="application/pdf,.pdf" class="sr" tabindex="-1" aria-hidden="true">
 
-    $("go").onclick = async () => {
-      let log = "";
-      const go = $("go");
-      result = null;
-      $("save").style.display = "none";
-      go.disabled = true;
+    <!-- 1. No file -->
+    <button class="drop" id="drop" type="button">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#0066CC" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      <b>Choose a PDF</b><span>or drag it here</span>
+    </button>
 
-      try {
-        const file = $("f").files[0];
-        if (!file) return msg("Pick a PDF first.");
-        if (file.type && file.type !== "application/pdf") return msg("Choose a PDF file.");
+    <!-- 2. File row -->
+    <div class="file" id="filerow" hidden>
+      <div class="badge" id="badge">PDF</div>
+      <div class="meta"><div class="name" id="fname"></div><div class="sub" id="fstate"></div></div>
+      <button class="textbtn" id="swap" type="button">Change</button>
+      <button class="roundbtn" id="rename" type="button" aria-label="Rename file" hidden>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1D1D1F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+      </button>
+    </div>
 
-        const cur = $("cur").value;
-        const mode = $("mode").value;
-        const np = $("new").value;
-        if (mode === "change" && !np) return msg("Enter a new password.");
-        if (typeof Module !== "function") return msg("Engine file not loaded.");
+    <!-- Form -->
+    <div id="form" hidden style="display:flex;flex-direction:column;gap:24px">
+      <div class="selectwrap">
+        <label class="sr" for="act">Action</label>
+        <select id="act" class="empty">
+          <option value="" selected disabled>Select an action</option>
+          <option value="remove">Remove password</option>
+          <option value="change">Change password</option>
+          <option value="add">Add password</option>
+        </select>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </div>
 
-        msg("Starting engine...");
-        const q = await Module({
-          locateFile: name => name.endsWith(".wasm") ? "./qpdf.wasm" : name,
-          noInitialRun: true,
-          print: text => { log += text + "\n"; },
-          printErr: text => { log += text + "\n"; }
-        });
+      <div class="field" id="curField" hidden>
+        <label><span>Current password</span><input id="cur" type="password" autocomplete="off" autocapitalize="off"></label>
+        <button class="eye" type="button" data-for="cur" aria-label="Show password"></button>
+      </div>
+      <div class="alert" id="curErr" role="alert" hidden>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D70015" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6"/><path d="M12 16.5v.5"/></svg>
+        <span id="curErrText"></span>
+      </div>
 
-        if (!q || !q.FS || typeof q.callMain !== "function") {
-          return msg("Engine started but is missing required features.");
-        }
+      <div class="field" id="newField" hidden>
+        <label><span>New password</span><input id="new" type="password" autocomplete="off" autocapitalize="off"></label>
+        <button class="eye" type="button" data-for="new" aria-label="Show password"></button>
+      </div>
 
-        msg("Processing...");
-        const data = new Uint8Array(await file.arrayBuffer());
-        q.FS.writeFile("/in.pdf", data);
+      <button class="primary" id="go" type="button" disabled>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.6-1.7"/></svg>
+        <span id="goText">Unlock</span>
+      </button>
+    </div>
 
-        const args = [];
-        if (cur) args.push("--password=" + cur);
-        if (mode === "remove") {
-          args.push("--decrypt", "/in.pdf", "/out.pdf");
-        } else {
-          args.push("--encrypt", np, np, "256", "--", "/in.pdf", "/out.pdf");
-        }
+    <!-- 5. Progress -->
+    <div id="progress" hidden style="display:flex;flex-direction:column;gap:24px">
+      <div class="prog">
+        <div class="top"><span id="pLabel">Starting…</span><span id="pPct">0%</span></div>
+        <div class="bar" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="pBar"><i id="pFill"></i></div>
+      </div>
+      <button class="cancel" id="cancel" type="button">Cancel</button>
+    </div>
 
-        let exitInfo = "";
-        try {
-          const code = q.callMain(args);
-          exitInfo = "exit " + code;
-          if (typeof code === "number" && code !== 0) {
-            return msg("qpdf failed (" + exitInfo + ").\n" + (log.trim() || "Check the current password and PDF file."));
-          }
-        } catch (error) {
-          // Some Emscripten builds throw ExitStatus even when main returns normally.
-          if (error && error.name === "ExitStatus" && error.status === 0) {
-            exitInfo = "exit 0";
-          } else {
-            exitInfo = "threw " + (error && (error.message || error.status) || error);
-          }
-        }
+    <!-- 6. Done -->
+    <div id="done" hidden>
+      <div class="row">
+        <button class="primary" id="save" type="button">Save file</button>
+        <button class="round52" id="again" type="button" aria-label="Start over">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1D1D1F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</main>
 
-        let out;
-        try {
-          out = q.FS.readFile("/out.pdf");
-        } catch (error) {
-          return msg("No output file (" + exitInfo + ").\nqpdf said:\n" + (log.trim() || "Check the current password and PDF file."));
-        }
-        if (!out || out.length === 0) return msg("qpdf produced an empty output file (" + exitInfo + ").\n" + (log.trim() || ""));
+<script src="./qpdf.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const EYE = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#6E6E73" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4"/><path d="M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 4-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
 
-        result = new File([out], file.name, { type: "application/pdf" });
-        $("save").style.display = "inline-block";
-        msg("Done. Tap Save file." + (log.trim() ? "\nNote: " + log.trim() : ""));
-      } catch (error) {
-        msg("Failed: " + (error && (error.message || error) || "Unknown error") + (log ? "\n" + log : ""));
-      } finally {
-        go.disabled = false;
+const TEXT = {
+  idle:   ["Unlock your PDF.", "Remove, change or add a password. Your file is processed in this browser and never uploaded."],
+  change: ["Change your password.", "Enter the current password, then choose a new one."],
+  add:    ["Add a password.", "Protect your PDF with a password of your choice."],
+  busy:   ["Working on your PDF.", "This only takes a moment."]
+};
+const GO = {
+  remove: ["Unlock", "Removing password…", "Password removed.", "Your unlocked copy is ready. The original file is unchanged."],
+  change: ["Update password", "Changing password…", "Password changed.", "Your updated copy is ready. The original file is unchanged."],
+  add:    ["Protect PDF", "Adding password…", "Password added.", "Your protected copy is ready. The original file is unchanged."]
+};
+
+let file = null, isProtected = false, outBlobFile = null, outName = "", token = 0;
+
+document.querySelectorAll(".eye").forEach(b => {
+  b.innerHTML = EYE;
+  b.onclick = () => {
+    const i = $(b.dataset.for);
+    const show = i.type === "password";
+    i.type = show ? "text" : "password";
+    b.innerHTML = show ? EYE_OFF : EYE;
+    b.setAttribute("aria-label", show ? "Hide password" : "Show password");
+  };
+});
+
+function setHead(pair){ $("title").textContent = pair[0]; $("sub").textContent = pair[1]; }
+function show(id, on){ $(id).hidden = !on; }
+
+function view(state){
+  // state: "none" | "form" | "busy" | "done"
+  show("drop", state === "none");
+  show("filerow", state !== "none");
+  show("form", state === "form");
+  show("progress", state === "busy");
+  show("done", state === "done");
+  show("swap", state === "form");
+  show("rename", state === "done");
+}
+
+function refresh(){
+  const a = $("act").value;
+  $("act").classList.toggle("empty", !a);
+  const needCur = isProtected && (a === "remove" || a === "change");
+  const needNew = a === "change" || a === "add";
+  show("curField", needCur);
+  show("newField", needNew);
+  if (!needCur) show("curErr", false);
+  if (a) { $("goText").textContent = GO[a][0]; }
+  const ok = !!file && !!a && (!needCur || $("cur").value) && (!needNew || $("new").value);
+  $("go").disabled = !ok;
+  if (view.state === "form") setHead(TEXT[a === "change" || a === "add" ? a : "idle"]);
+}
+
+function chooseFile(f){
+  if (!f) return;
+  file = f; outBlobFile = null;
+  $("fname").textContent = f.name;
+  $("fstate").textContent = "Checking…";
+  $("badge").className = "badge"; $("badge").textContent = "PDF";
+  $("act").selectedIndex = 0; $("cur").value = ""; $("new").value = "";
+  show("curErr", false); $("curField").classList.remove("bad");
+  view.state = "form"; view("form"); refresh();
+  f.arrayBuffer().then(buf => {
+    if (file !== f) return;
+    const txt = new TextDecoder("latin1").decode(new Uint8Array(buf));
+    isProtected = /\/Encrypt\b/.test(txt);
+    $("fstate").textContent = isProtected ? "Password protected" : "Not protected";
+    refresh();
+  }).catch(() => { $("fstate").textContent = "Could not read file"; });
+}
+
+$("drop").onclick = () => $("f").click();
+$("swap").onclick = () => { $("f").value = ""; $("f").click(); };
+$("f").onchange = e => chooseFile(e.target.files[0]);
+["dragenter","dragover"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.add("over"); }));
+["dragleave","drop"].forEach(ev => $("drop").addEventListener(ev, e => { e.preventDefault(); $("drop").classList.remove("over"); }));
+$("drop").addEventListener("drop", e => chooseFile(e.dataTransfer.files[0]));
+
+$("act").onchange = refresh;
+$("cur").oninput = () => { show("curErr", false); $("curField").classList.remove("bad"); refresh(); };
+$("new").oninput = refresh;
+
+function progress(label, pct){
+  $("pLabel").textContent = label;
+  $("pPct").textContent = pct + "%";
+  $("pFill").style.width = pct + "%";
+  $("pBar").setAttribute("aria-valuenow", pct);
+}
+const tick = ms => new Promise(r => setTimeout(r, ms));
+
+function showError(text, onCurrent){
+  view.state = "form"; view("form"); refresh();
+  $("curErrText").textContent = text;
+  show("curErr", true);
+  $("curField").classList.toggle("bad", !!onCurrent && !$("curField").hidden);
+  setHead(TEXT.idle);
+}
+
+$("go").onclick = async () => {
+  const a = $("act").value, cur = $("cur").value, np = $("new").value;
+  const my = ++token;
+  let log = "";
+  view.state = "busy"; view("busy");
+  setHead(TEXT.busy);
+  $("curField").classList.remove("bad");
+  progress("Starting engine…", 10);
+  try {
+    if (typeof Module !== "function") throw new Error("Engine file not loaded.");
+    const q = await Module({
+      locateFile: () => "./qpdf.wasm",
+      noInitialRun: true,
+      print: t => log += t + "\n",
+      printErr: t => log += t + "\n"
+    });
+    if (my !== token) return;
+    if (!q || !q.FS || !q.callMain) throw new Error("Engine started but is missing parts.");
+
+    progress("Reading file…", 35);
+    q.FS.writeFile("/in.pdf", new Uint8Array(await file.arrayBuffer()));
+    if (my !== token) return;
+
+    progress(GO[a][1], 65);
+    await tick(60); // let the screen update before the blocking step
+
+    const args = [];
+    if (a !== "add" && cur) args.push("--password=" + cur);
+    if (a === "remove") args.push("--decrypt", "/in.pdf", "/out.pdf");
+    else args.push("--encrypt", np, np, "256", "--", "/in.pdf", "/out.pdf");
+
+    let exitInfo = "";
+    try { exitInfo = "exit " + q.callMain(args); }
+    catch (e) { exitInfo = "threw " + (e && (e.message || e.status) || e); }
+    if (my !== token) return;
+
+    let out;
+    try { out = q.FS.readFile("/out.pdf"); }
+    catch (e) {
+      const l = log.toLowerCase();
+      if (l.includes("invalid password") || l.includes("password")) {
+        if (a === "add" && isProtected) return showError("This file already has a password. Choose Change password instead.", false);
+        return showError("Incorrect password. Check it and try again.", true);
       }
-    };
+      return showError("Could not process this PDF (" + exitInfo + ").\n" + (log.trim() || "No details from the engine."), false);
+    }
 
-    $("save").onclick = async () => {
-      if (!result) return msg("Process a PDF before saving.");
+    progress("Done", 100);
+    await tick(250);
+    if (my !== token) return;
 
-      if (navigator.canShare && navigator.canShare({ files: [result] }) && navigator.share) {
-        try {
-          await navigator.share({ files: [result], title: result.name });
-          return;
-        } catch (error) {
-          if (error && error.name === "AbortError") return;
-          // Fall through to the download option if sharing is unavailable.
-        }
-      }
+    outName = file.name;
+    outBlobFile = new File([out], outName, { type: "application/pdf" });
+    $("fname").textContent = outName;
+    $("fstate").textContent = a === "remove" ? "Unlocked" : "Protected";
+    $("badge").className = "badge ok";
+    $("badge").innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#248A3D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+    setHead([GO[a][2], GO[a][3]]);
+    view.state = "done"; view("done");
+  } catch (e) {
+    if (my !== token) return;
+    showError("Failed: " + (e.message || e) + (log.trim() ? "\n" + log.trim() : ""), false);
+  }
+};
 
-      const url = URL.createObjectURL(result);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = result.name;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      msg("File download started.");
-    };
-  </script>
+$("cancel").onclick = () => { token++; view.state = "form"; view("form"); refresh(); };
+
+$("rename").onclick = () => {
+  const n = prompt("File name", outName);
+  if (!n) return;
+  outName = /\.pdf$/i.test(n) ? n : n + ".pdf";
+  outBlobFile = new File([outBlobFile], outName, { type: "application/pdf" });
+  $("fname").textContent = outName;
+};
+
+$("save").onclick = async () => {
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [outBlobFile] })) {
+      await navigator.share({ files: [outBlobFile] });
+    } else {
+      const url = URL.createObjectURL(outBlobFile);
+      const l = document.createElement("a");
+      l.href = url; l.download = outName; document.body.appendChild(l); l.click(); l.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    }
+  } catch (e) {
+    if (e && e.name !== "AbortError") alert("Could not save: " + (e.message || e));
+  }
+};
+
+$("again").onclick = () => {
+  token++; file = null; outBlobFile = null; isProtected = false;
+  $("f").value = ""; $("cur").value = ""; $("new").value = "";
+  $("badge").className = "badge"; $("badge").textContent = "PDF";
+  view.state = "none"; view("none"); setHead(TEXT.idle);
+};
+
+view.state = "none"; view("none");
+</script>
 </body>
 </html>
